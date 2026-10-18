@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedInAs(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Each person can only ever see and change their own data.
+    match /users/{uid} {
+      allow read, write: if signedInAs(uid);
+
+      match /sessions/{sid} {
+        allow read, delete: if signedInAs(uid);
+        allow create, update: if signedInAs(uid)
+          && request.resource.data.start is number
+          && request.resource.data.dur is number
+          && request.resource.data.dur > 0
+          && request.resource.data.dur <= 86400000
+          && request.resource.data.kind in ['study', 'fun', 'sleep'];
+      }
+
+      match /meta/{doc} {
+        allow read, write: if signedInAs(uid);
+      }
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
